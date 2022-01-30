@@ -5,14 +5,17 @@ canvas.height = 600;
 
 const cellSize = 100;
 const cellGap = 3;
-const gameGrid = [];
-let defenders = [];
 let numberOfResources = 300;
-const enemies = [];
-const enemiesPosition = [];
 let enemiesInterval = 600;
 let frame = 0;
 let gameOver = false;
+let score = 0;
+const gameGrid = [];
+let defenders = [];
+let enemies = [];
+let enemiesPosition = [];
+const projectiles = [];
+
 //---------------MOUSE-------------------
 let mouse = {
   x: 10,
@@ -94,6 +97,16 @@ class Defender {
     ctx.font = "30px Orbitron";
     ctx.fillText(Math.floor(this.health), this.x + 15, this.y + 30);
   }
+  update() {
+    if (this.shooting) {
+      this.timer++;
+      if (this.timer % 100 === 0) {
+        projectiles.push(new Projectile(this.x + 70, this.y + 50));
+      }
+    } else {
+      this.timer = 0;
+    }
+  }
 }
 
 canvas.addEventListener("click", () => {
@@ -117,6 +130,12 @@ canvas.addEventListener("click", () => {
 function handleDefenders() {
   defenders.forEach((defender, index) => {
     defender.draw();
+    defender.update();
+    if (enemiesPosition.indexOf(defender.y) !== -1) {
+      defender.shooting = true;
+    } else {
+      defender.shooting = false;
+    }
     enemies.forEach((enemy) => {
       if (collision(defender, enemy)) {
         enemy.movement = 0;
@@ -133,6 +152,43 @@ function handleDefenders() {
   });
 }
 //---------------DEFENDER------------------
+//---------------PROJECTILES---------------
+class Projectile {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.width = 10;
+    this.height = 10;
+    this.power = 20;
+    this.speed = 5;
+  }
+  update() {
+    this.x += this.speed;
+  }
+  draw() {
+    ctx.fillStyle = "black";
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.width, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function handleProjectiles() {
+  projectiles.forEach((projectile, index) => {
+    projectile.update();
+    projectile.draw();
+    enemies.forEach((enemy, enemyIndex) => {
+      if (enemy && projectile && collision(projectile, enemy)) {
+        enemy.health -= projectile.power;
+        projectiles.splice(index, 1);
+      }
+    });
+    if (projectile.x > canvas.width - cellSize) {
+      projectiles.splice(index, 1);
+    }
+  });
+}
+//---------------PROJECTILES---------------
 //---------------ENEMIES-------------------
 class Enemy {
   constructor(verticalPosition) {
@@ -164,6 +220,15 @@ function handleEnemies() {
     if (enemy.x < 0) {
       gameOver = true;
     }
+    if (enemy.health <= 0) {
+      let gainedResources = enemy.maxHealth / 10;
+      numberOfResources += gainedResources;
+      score += gainedResources;
+      let aliveEnemies = enemies.filter((enemy) => enemy.health > 0);
+      let enemyPositionIndex = enemiesPosition.indexOf(enemy.y);
+      enemiesPosition.splice(enemyPositionIndex, 1);
+      enemies = aliveEnemies;
+    }
   });
   if (frame % enemiesInterval === 0) {
     let verticalPosition = Math.floor(Math.random() * 5 + 1) * cellSize;
@@ -178,7 +243,9 @@ function handleEnemies() {
 function handleGameStatus() {
   ctx.fillStyle = "black";
   ctx.font = "30px Orbitron";
-  ctx.fillText("Resources: " + numberOfResources, 20, 55);
+  ctx.fillText("Resources: " + numberOfResources, 20, 75);
+  ctx.fillText("Score: " + score, 20, 35);
+
   if (gameOver) {
     ctx.fillStyle = "black";
     ctx.font = "60px Orbitron";
@@ -192,6 +259,7 @@ function animate() {
   ctx.fillRect(0, 0, controlsBar.width, controlsBar.height);
   handleGameGrid();
   handleDefenders();
+  handleProjectiles();
   handleEnemies();
   handleGameStatus();
   frame++;
